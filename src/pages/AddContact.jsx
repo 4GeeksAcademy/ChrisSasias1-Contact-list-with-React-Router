@@ -2,91 +2,118 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 export const AddContact = () => {
-    const navigate = useNavigate();
+  const navigate = useNavigate();
 
-    const [form, setForm] = useState({
-        name: "",
-        email: "",
-        phone: "",
-        address: "",
-    });
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    address: "",
+  });
 
-    const AGENDA = "chris";
-    const API = `https://playground.4geeks.com/contact/agendas/${AGENDA}/contacts`;
+  const BASE = "https://playground.4geeks.com/contact";
+  const AGENDA = "chris";
 
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
 
-    const handleChange = (e) => {
-        setForm({ ...form, [e.target.name]: e.target.value });
-    };
+  const ensureAgendaExists = async () => {
+    // 1) Intento: ver si existe
+    let resp = await fetch(`${BASE}/agendas/${AGENDA}`);
+    if (resp.ok) return true;
 
-    const saveContact = async (e) => {
-        e.preventDefault();
+    // 2) No existe (o falló): intento crearla
+    resp = await fetch(`${BASE}/agendas/${AGENDA}`, { method: "POST" });
+    if (resp.ok) return true;
 
-        try {
-            const resp = await fetch(API, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    ...form,
-                    agenda_slug: "chris"
-                })
-            });
+    // 3) Por las dudas: si el POST no devolvió ok, vuelvo a chequear con GET
+    // (a veces el POST puede fallar por edge-cases, pero la agenda ya quedó creada)
+    const resp2 = await fetch(`${BASE}/agendas/${AGENDA}`);
+    return resp2.ok;
+  };
 
+  const saveContact = async (e) => {
+    e.preventDefault();
 
-            if (!resp.ok) {
-                alert("Error al guardar contacto");
-                return;
-            }
+    try {
+      const agendaOk = await ensureAgendaExists();
+      if (!agendaOk) {
+        alert("No se pudo crear/verificar la agenda");
+        return;
+      }
 
-            navigate("/");
-        } catch (e) {
-            console.log("Error:", e);
-        }
-    };
+      const resp = await fetch(`${BASE}/agendas/${AGENDA}/contacts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name,      // requerido
+          email: form.email,
+          phone: form.phone,
+          address: form.address,
+        }),
+      });
 
-    return (
-        <div className="container mt-5" style={{ maxWidth: "600px" }}>
-            <h2 className="text-center mb-4">Add a new contact</h2>
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        console.log("POST contacto falló:", resp.status, err);
+        alert("Error al guardar contacto");
+        return;
+      }
 
-            <form onSubmit={saveContact}>
+      navigate("/");
+    } catch (err) {
+      console.log("Error:", err);
+      alert("Error de red");
+    }
+  };
 
-                <input
-                    className="form-control mb-3"
-                    placeholder="Full Name"
-                    name="name"
-                    onChange={handleChange}
-                />
+  return (
+    <div className="container mt-5" style={{ maxWidth: "600px" }}>
+      <h2 className="text-center mb-4">Add a new contact</h2>
 
-                <input
-                    className="form-control mb-3"
-                    placeholder="Enter email"
-                    name="email"
-                    onChange={handleChange}
-                />
+      <form onSubmit={saveContact}>
+        <input
+          className="form-control mb-3"
+          placeholder="Full Name"
+          name="name"
+          value={form.name}
+          onChange={handleChange}
+          required
+        />
 
-                <input
-                    className="form-control mb-3"
-                    placeholder="Enter phone"
-                    name="phone"
-                    onChange={handleChange}
-                />
+        <input
+          className="form-control mb-3"
+          placeholder="Enter email"
+          name="email"
+          value={form.email}
+          onChange={handleChange}
+        />
 
-                <input
-                    className="form-control mb-3"
-                    placeholder="Enter address"
-                    name="address"
-                    onChange={handleChange}
-                />
+        <input
+          className="form-control mb-3"
+          placeholder="Enter phone"
+          name="phone"
+          value={form.phone}
+          onChange={handleChange}
+        />
 
-                <button className="btn btn-primary w-100">save</button>
+        <input
+          className="form-control mb-3"
+          placeholder="Enter address"
+          name="address"
+          value={form.address}
+          onChange={handleChange}
+        />
 
-                <div className="mt-3 text-center">
-                    <Link to="/" className="text-secondary d-flex">
-                        or get back to contacts
-                    </Link>
-                </div>
+        <button className="btn btn-primary w-100">save</button>
 
-            </form>
+        <div className="mt-3 text-center">
+          <Link to="/" className="text-secondary d-flex">
+            or get back to contacts
+          </Link>
         </div>
-    );
+      </form>
+    </div>
+  );
 };
